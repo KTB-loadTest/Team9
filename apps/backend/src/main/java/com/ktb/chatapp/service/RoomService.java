@@ -10,9 +10,13 @@ import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -74,8 +78,11 @@ public class RoomService {
             }
 
             // Room을 RoomResponse로 변환
+            // 참여자/생성자 정보를 미리 한 번에 적재해 N+1을 방지
+            Map<String, User> userLookup = preloadUsersForRooms(roomPage.getContent());
+
             List<RoomResponse> roomResponses = roomPage.getContent().stream()
-                .map(room -> mapToRoomResponse(room, name))
+                .map(room -> mapToRoomResponse(room, name, userLookup))
                 .collect(Collectors.toList());
 
             // 메타데이터 생성
@@ -171,7 +178,8 @@ public class RoomService {
         
         // Publish event for room created
         try {
-            RoomResponse roomResponse = mapToRoomResponse(savedRoom, name);
+            Map<String, User> userLookup = preloadUsersForRooms(List.of(savedRoom));
+            RoomResponse roomResponse = mapToRoomResponse(savedRoom, name, userLookup);
             eventPublisher.publishEvent(new RoomCreatedEvent(this, roomResponse));
         } catch (Exception e) {
             log.error("roomCreated 이벤트 발행 실패", e);
@@ -210,7 +218,8 @@ public class RoomService {
         
         // Publish event for room updated
         try {
-            RoomResponse roomResponse = mapToRoomResponse(room, name);
+            Map<String, User> userLookup = preloadUsersForRooms(List.of(room));
+            RoomResponse roomResponse = mapToRoomResponse(room, name, userLookup);
             eventPublisher.publishEvent(new RoomUpdatedEvent(this, roomId, roomResponse));
         } catch (Exception e) {
             log.error("roomUpdate 이벤트 발행 실패", e);
@@ -219,19 +228,27 @@ public class RoomService {
         return room;
     }
 
-    private RoomResponse mapToRoomResponse(Room room, String name) {
+    private RoomResponse mapToRoomResponse(Room room, String name, Map<String, User> userLookup) {
         if (room == null) return null;
 
-        User creator = null;
-        if (room.getCreator() != null) {
-            creator = userRepository.findById(room.getCreator()).orElse(null);
-        }
+        // 생성자/참가자 조회 시 DB 왕복 최소화: lookup Map을 우선 사용하고, 없으면 null.
+        User creator = room.getCreator() != null ? userLookup.get(room.getCreator()) : null;
 
-        List<User> participants = room.getParticipantIds().stream()
-            .map(userRepository::findById)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .toList();
+        // 기존 방식: 참가자마다 findById 호출 → 참가자 수만큼 DB round-trip (N+1).
+        // List<User> participants = room.getParticipantIds().stream()
+        //     .map(userRepository::findById)
+        //     .filter(Optional::isPresent)
+        //     .map(Optional::get)
+        //     .toList();
+        //
+        // 개선: mapToRoomResponse 호출 전 한 번에 적재해둔 userLookup을 활용.
+        Set<String> participantIds = room.getParticipantIds();
+        List<User> participants = participantIds == null || participantIds.isEmpty()
+            ? List.of()
+            : participantIds.stream()
+                .map(userLookup::get)
+                .filter(Objects::nonNull)
+                .toList();
 
         // 최근 10분간 메시지 수 조회
         LocalDateTime tenMinutesAgo = LocalDateTime.now().minusMinutes(10);
@@ -258,5 +275,30 @@ public class RoomService {
             .isCreator(creator != null && creator.getId().equals(name))
             .recentMessageCount((int) recentMessageCount)
             .build();
+    }
+
+    private Map<String, User> preloadUsersForRooms(List<Room> rooms) {
+        if (rooms == null || rooms.isEmpty()) {
+            return Map.of();
+        }
+
+        // 기존: 방별로 findById 반복 → 방 개수 * 참가자 수 만큼 쿼리 (N+1).
+        // 개선: 필요한 userId를 모두 모아 findAllById 한 번으로 적재.
+        Set<String> userIds = new HashSet<>();
+        for (Room room : rooms) {
+            if (room.getCreator() != null) {
+                userIds.add(room.getCreator());
+            }
+            if (room.getParticipantIds() != null) {
+                userIds.addAll(room.getParticipantIds());
+            }
+        }
+
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
     }
 }

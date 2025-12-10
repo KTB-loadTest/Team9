@@ -287,15 +287,36 @@ public class RoomController {
             throw new RuntimeException("Creator not found for room " + room.getId());
         }
         UserResponse creatorSummary = UserResponse.from(creator);
-        List<UserResponse> participantSummaries = room.getParticipantIds()
-                .stream()
-                .map(userRepository::findById).peek(optUser -> {
-                    if (optUser.isEmpty()) {
-                        log.warn("Participant not found: roomId={}, userId={}", room.getId(), optUser);
+        // 기존: 참가자마다 findById → 참가자 수만큼 DB round-trip (N+1).
+        // List<UserResponse> participantSummaries = room.getParticipantIds()
+        //         .stream()
+        //         .map(userRepository::findById)
+        //         .peek(optUser -> {
+        //             if (optUser.isEmpty()) {
+        //                 log.warn("Participant not found: roomId={}, userId={}", room.getId(), optUser);
+        //             }
+        //         })
+        //         .filter(Optional::isPresent)
+        //         .map(Optional::get)
+        //         .map(UserResponse::from)
+        //         .toList();
+        //
+        // 개선: participantIds를 모아 findAllById 한 번으로 조회 후 변환.
+        List<String> participantIds = room.getParticipantIds() == null
+                ? List.of()
+                : room.getParticipantIds().stream().toList();
+        List<User> participants = participantIds.isEmpty()
+                ? List.of()
+                : userRepository.findAllById(participantIds);
+
+        List<UserResponse> participantSummaries = participants.stream()
+                .filter(p -> {
+                    boolean present = p != null && p.getId() != null;
+                    if (!present) {
+                        log.warn("Participant not found: roomId={}, userId=null", room.getId());
                     }
+                    return present;
                 })
-                .filter(Optional::isPresent)
-                .map(Optional::get)
                 .map(UserResponse::from)
                 .toList();
 
