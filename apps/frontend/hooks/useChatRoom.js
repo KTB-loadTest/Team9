@@ -504,14 +504,6 @@ export const useChatRoom = () => {
     removeFilePreview: removeFile
   } = useFileHandling(socketRef, currentUser, router);
 
-  // Enter key handler
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleMessageSubmit(e);
-    }
-  }, [handleMessageSubmit]);
-
   return {
     // State
     room,
@@ -541,7 +533,6 @@ export const useChatRoom = () => {
     handleMessageChange,
     handleMessageSubmit,
     handleEmojiToggle,
-    handleKeyDown,
     handleConnectionError,
     handleReconnect,
     getFilteredParticipants,
