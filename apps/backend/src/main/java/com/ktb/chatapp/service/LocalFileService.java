@@ -8,6 +8,7 @@ import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.util.FileUtil;
 import jakarta.annotation.PostConstruct;
+
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -31,17 +33,20 @@ public class LocalFileService implements FileService {
     private final FileRepository fileRepository;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
+    private final RedisService redisService;
 
     public LocalFileService(@Value("${file.upload-dir:uploads}") String uploadDir,
-                      FileRepository fileRepository,
-                      MessageRepository messageRepository,
-                      RoomRepository roomRepository) {
+                            FileRepository fileRepository,
+                            MessageRepository messageRepository,
+                            RoomRepository roomRepository,
+                            RedisService redisService) {
         this.fileRepository = fileRepository;
         this.messageRepository = messageRepository;
         this.roomRepository = roomRepository;
         this.fileStorageLocation = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.redisService = redisService;
     }
-    
+
     @PostConstruct
     public void init() {
         try {
@@ -152,8 +157,11 @@ public class LocalFileService implements FileService {
                     .orElseThrow(() -> new RuntimeException("파일을 찾을 수 없습니다: " + fileName));
 
             // 2. 메시지 조회 (파일과 메시지 연결 확인) - 효율적인 쿼리 메서드 사용
-            Message message = messageRepository.findByFileId(fileEntity.getId())
-                    .orElseThrow(() -> new RuntimeException("파일과 연결된 메시지를 찾을 수 없습니다"));
+            Message message = redisService.findMessageByFileId(fileEntity.getId());
+            if (message == null) {
+                message = messageRepository.findByFileId(fileEntity.getId())
+                        .orElseThrow(() -> new RuntimeException("파일과 연결된 메시지를 찾을 수 없습니다"));
+            }
 
             // 3. 방 조회 (사용자가 방 참가자인지 확인)
             Room room = roomRepository.findById(message.getRoomId())

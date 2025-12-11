@@ -6,6 +6,7 @@ import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.dto.MessageReactionRequest;
 import com.ktb.chatapp.dto.MessageReactionResponse;
 import com.ktb.chatapp.model.Message;
+import com.ktb.chatapp.service.RedisService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class MessageReactionHandler {
     
     private final SocketIOServer socketIOServer;
     private final MongoTemplate mongoTemplate;
+    private final RedisService redisService;
     
     @OnEvent(MESSAGE_REACTION)
     public void handleMessageReaction(SocketIOClient client, MessageReactionRequest data) {
@@ -61,7 +63,11 @@ public class MessageReactionHandler {
              *  - 문서 일부 필드만 프로젝션 (room, reactions) 으로 전송량 감소
              *  - 동시성 안전하게 리액션 추가/제거
              */
-            Message message = updateReactionsAtomic(data.getMessageId(), data.getReaction(), data.getType(), userId);
+            Message message = redisService.handleMessageReaction(data.getMessageId(), data.getReaction(), data.getType(), userId);
+            if (message == null) {
+                message = updateReactionsAtomic(data.getMessageId(), data.getReaction(), data.getType(), userId);
+            }
+
             if (message == null) {
                 client.sendEvent(ERROR, Map.of("message", "메시지를 찾을 수 없습니다."));
                 return;

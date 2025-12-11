@@ -13,6 +13,7 @@ import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.RedisService;
 import com.ktb.chatapp.util.BannedWordChecker;
 import com.ktb.chatapp.websocket.socketio.ai.AiService;
 import com.ktb.chatapp.service.SessionService;
@@ -48,7 +49,8 @@ public class ChatMessageHandler {
     private final BannedWordChecker bannedWordChecker;
     private final RateLimitService rateLimitService;
     private final MeterRegistry meterRegistry;
-    
+    private final RedisService redisService;
+
     @OnEvent(CHAT_MESSAGE)
     public void handleChatMessage(SocketIOClient client, ChatMessageRequest data) {
         Timer.Sample timerSample = Timer.start(meterRegistry);
@@ -159,13 +161,16 @@ public class ChatMessageHandler {
                 return;
             }
 
-            Message savedMessage = messageRepository.save(message);
+            Message savedMessage = redisService.save(message);
+            if (savedMessage == null) {
+                savedMessage = messageRepository.save(message);
+            }
 
             socketIOServer.getRoomOperations(roomId)
                     .sendEvent(MESSAGE, createMessageResponse(savedMessage, sender));
 
             // AI 멘션 처리
-            aiService.handleAIMentions(roomId, socketUser.id(), messageContent);
+//            aiService.handleAIMentions(roomId, socketUser.id(), messageContent);
 
             sessionService.updateLastActivity(socketUser.id());
 

@@ -8,6 +8,7 @@ import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
+import com.ktb.chatapp.service.RedisService;
 import net.datafaker.Faker;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +47,9 @@ class MessageLoaderTest {
     
     @Mock
     private MessageReadStatusService messageReadStatusService;
+
+    @Mock
+    private RedisService redisService;
     
     @InjectMocks
     private MessageLoader messageLoader;
@@ -65,7 +69,8 @@ class MessageLoaderTest {
                 messageRepository,
                 userRepository,
                 new MessageResponseMapper(fileRepository),
-                messageReadStatusService
+                messageReadStatusService,
+                redisService
         );
         
         var testUser = User.builder()

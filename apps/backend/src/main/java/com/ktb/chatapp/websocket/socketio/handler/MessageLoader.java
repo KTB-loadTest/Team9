@@ -8,6 +8,7 @@ import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
+import com.ktb.chatapp.service.RedisService;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,7 @@ public class MessageLoader {
     private final UserRepository userRepository;
     private final MessageResponseMapper messageResponseMapper;
     private final MessageReadStatusService messageReadStatusService;
+    private final RedisService redisService;
 
     private static final int BATCH_SIZE = 30;
 
@@ -42,6 +44,11 @@ public class MessageLoader {
      */
     public FetchMessagesResponse loadMessages(FetchMessagesRequest data, String userId) {
         try {
+            FetchMessagesResponse cached = redisService.loadMessages(data.roomId(), data.limit(BATCH_SIZE), data.before(LocalDateTime.now()), userId);
+            if (cached != null && !cached.getMessages().isEmpty()) {
+                return cached;
+            }
+
             return loadMessagesInternal(data.roomId(), data.limit(BATCH_SIZE), data.before(LocalDateTime.now()), userId);
         } catch (Exception e) {
             log.error("Error loading initial messages for room {}", data.roomId(), e);
