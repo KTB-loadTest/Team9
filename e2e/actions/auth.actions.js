@@ -14,6 +14,7 @@ async function loginAction(page, credentials, waitForRedirect = true) {
   if (waitForRedirect) {
     await page.waitForURL(`${BASE_URL}/chat`);
   }
+
 }
 
 /**
