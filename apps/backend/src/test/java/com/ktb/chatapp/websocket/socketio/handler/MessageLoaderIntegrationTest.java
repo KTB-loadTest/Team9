@@ -61,10 +61,12 @@ class MessageLoaderIntegrationTest {
         userId = faker.internet().uuid();
 
         // MessageLoader 인스턴스 생성
+
         messageLoader = new MessageLoader(
                 messageRepository,
                 userRepository,
-                new MessageResponseMapper(fileRepository),
+                fileRepository,
+                new MessageResponseMapper(),
                 messageReadStatusService
         );
 
