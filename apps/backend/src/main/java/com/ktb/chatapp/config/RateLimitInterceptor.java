@@ -5,7 +5,7 @@ import com.ktb.chatapp.annotation.RateLimit;
 import com.ktb.chatapp.dto.ApiErrorCode;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.service.RateLimitCheckResult;
-import com.ktb.chatapp.service.RateLimitService;
+import com.ktb.chatapp.service.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -25,7 +25,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @RequiredArgsConstructor
 public class RateLimitInterceptor implements HandlerInterceptor {
 
-    private final RateLimitService rateLimitService;
+    private final RateLimiter rateLimiter;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -44,7 +44,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         Duration window = Duration.ofSeconds(rateLimit.windowSeconds());
         String clientId = generateClientId(request, rateLimit.scope());
 
-        RateLimitCheckResult result = rateLimitService.checkRateLimit(clientId, maxRequests, window);
+        RateLimitCheckResult result = rateLimiter.checkRateLimit(clientId, maxRequests, window);
         applyRateLimitHeaders(response, result);
 
         if (result.allowed()) {

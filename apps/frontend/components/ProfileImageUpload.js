@@ -69,7 +69,9 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
           }),
         }
       );
+
       console.log(response);
+
       // 인증 정보 확인
       if (!user?.token) {
         throw new Error('인증 정보가 없습니다.');

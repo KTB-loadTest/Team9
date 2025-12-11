@@ -5,15 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import io.lettuce.core.ReadFrom;
+import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.RedisStaticMasterReplicaConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -21,36 +21,23 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.data.redis.master.host}")
-    private String masterHost;
+    @Value("${spring.data.redis.host}")
+    private String host;
 
-    @Value("${spring.data.redis.master.port}")
-    private Integer masterPort;
-
-    @Value("${spring.data.redis.replica.host:}")
-    private String replicaHost;
-
-    @Value("${spring.data.redis.replica.port:0}")
-    private Integer replicaPort;
+    @Value("${spring.data.redis.port}")
+    private Integer port;
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        boolean hasReplica = replicaHost != null && !replicaHost.isBlank()
-                && replicaPort != null && replicaPort > 0;
+          // 최소 idle
 
-        LettuceClientConfiguration clientConfig = LettuceClientConfiguration.builder()
-                .readFrom(hasReplica ? ReadFrom.MASTER_PREFERRED : ReadFrom.MASTER)
-                .build();
-
-        if (hasReplica) {
-            RedisStaticMasterReplicaConfiguration redisConfig =
-                    new RedisStaticMasterReplicaConfiguration(masterHost, masterPort);
-            redisConfig.addNode(replicaHost, replicaPort);
-            return new LettuceConnectionFactory(redisConfig, clientConfig);
-        }
+        LettuceClientConfiguration clientConfig =
+                LettucePoolingClientConfiguration.builder()
+                        .build();
 
         RedisStandaloneConfiguration standaloneConfig =
-                new RedisStandaloneConfiguration(masterHost, masterPort);
+                new RedisStandaloneConfiguration(host, port);
+
         return new LettuceConnectionFactory(standaloneConfig, clientConfig);
     }
 

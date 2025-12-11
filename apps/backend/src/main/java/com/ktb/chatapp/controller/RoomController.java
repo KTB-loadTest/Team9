@@ -95,7 +95,6 @@ public class RoomController {
             content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping
-    @RateLimit
     public ResponseEntity<?> getAllRooms(
             @Parameter(description = "페이지 번호 (0부터 시작)", example = "0") @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기 (최대 50)", example = "10") @RequestParam(defaultValue = "10") int pageSize,

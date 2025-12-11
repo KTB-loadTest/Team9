@@ -8,6 +8,7 @@ import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,7 +17,8 @@ import static java.net.InetAddress.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RateLimitService {
+@ConditionalOnProperty(name = "app.rate-limit.enabled", havingValue = "true", matchIfMissing = true)
+public class RateLimitService implements RateLimiter {
 
     private final RateLimitStore rateLimitStore;
     @Value("${HOSTNAME:''}")
