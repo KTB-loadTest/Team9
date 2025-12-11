@@ -52,7 +52,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
 
       // 2) 백엔드에 key만 저장
       const response = await fetch(
-        `http://localhost:5001/api/files/upload`,
+        `http://localhost:5001/api/users/profile-image`,
         {
           method: "POST",
           headers: {
@@ -69,6 +69,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
           }),
         }
       );
+      console.log(response);
       // 인증 정보 확인
       if (!user?.token) {
         throw new Error('인증 정보가 없습니다.');
