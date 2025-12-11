@@ -64,7 +64,8 @@ class MessageLoaderTest {
         messageLoader = new MessageLoader(
                 messageRepository,
                 userRepository,
-                new MessageResponseMapper(fileRepository),
+                fileRepository,
+                new MessageResponseMapper(),
                 messageReadStatusService
         );
         
