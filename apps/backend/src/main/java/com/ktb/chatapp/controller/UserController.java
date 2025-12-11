@@ -85,7 +85,7 @@ public class UserController {
     @PutMapping("/profile")
     public ResponseEntity<?> updateCurrentUserProfile(
             Principal principal,
-            @Valid @RequestBody UpdateProfileRequest updateRequest) {
+            @Valid @org.springframework.web.bind.annotation.RequestBody UpdateProfileRequest updateRequest) {
 
         try {
             UserResponse response = userService.updateUserProfile(principal.getName(), updateRequest);

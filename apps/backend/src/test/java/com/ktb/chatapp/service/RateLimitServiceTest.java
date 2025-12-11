@@ -17,7 +17,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @Import(MongoTestContainer.class)
 @TestPropertySource(properties = {
-        "socketio.enabled=false"
+        "socketio.enabled=false",
+        // 테스트 시 RateLimitService 빈 활성화
+        "app.rate-limit.enabled=true"
 })
 @DisplayName("RateLimitService 통합 테스트")
 class RateLimitServiceTest {
