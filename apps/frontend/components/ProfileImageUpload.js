@@ -15,8 +15,8 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
   // 프로필 이미지 URL 생성
   const getProfileImageUrl = (imagePath) => {
     if (!imagePath) return null;
-    return imagePath.startsWith('http') ? 
-      imagePath : 
+    return imagePath.startsWith('http') ?
+      imagePath :
       `${process.env.NEXT_PUBLIC_API_URL}${imagePath}`;
   };
 
@@ -48,24 +48,37 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
 
+      const { key, url } = await uploadToS3(file);
+
+      // 2) 백엔드에 key만 저장
+      const response = await fetch(
+        `http://localhost:5001/api/files/upload`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-auth-token": user?.token,
+            "x-session-id": user?.sessionId,
+          },
+          body: JSON.stringify({
+            key: key,
+            url: url,
+            originalname: file.name,
+            mimetype: file.type,
+            size: file.size,
+          }),
+        }
+      );
       // 인증 정보 확인
       if (!user?.token) {
         throw new Error('인증 정보가 없습니다.');
       }
 
+      /*
       // FormData 생성
       const formData = new FormData();
       formData.append('profileImage', file);
-
-      // 파일 업로드 요청
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users/profile-image`, {
-        method: 'POST',
-        headers: {
-          'x-auth-token': user?.token,
-          'x-session-id': user?.sessionId
-        },
-        body: formData
-      });
+      */
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -73,16 +86,16 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
       }
 
       const data = await response.json();
-      
+
       // 로컬 스토리지의 사용자 정보 업데이트
       const updatedUser = {
         ...user,
-        profileImage: data.imageUrl
+        profileImage: url,
       };
       localStorage.setItem('user', JSON.stringify(updatedUser));
 
       // 부모 컴포넌트에 변경 알림
-      onImageChange(data.imageUrl);
+      onImageChange(url);
 
       Toast.success('프로필 이미지가 변경되었습니다.');
 
@@ -93,7 +106,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
       console.error('Image upload error:', error);
       setError(error.message);
       setPreviewUrl(getProfileImageUrl(currentImage));
-      
+
       // 기존 objectUrl 정리
       if (previewUrl && previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(previewUrl);
@@ -105,6 +118,34 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
       }
     }
   };
+
+  async function uploadToS3(file) {
+    const key = `${crypto.randomUUID()}-${file.name}`;
+
+    //const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+    //const url = `https://s3.${region}.amazonaws.com/${bucket}/${key}`;
+    const url = `https://s3.ap-northeast-2.amazonaws.com/goorm-ktb-009.goorm.team/uploads/${key}`;
+
+
+    console.log("--- File 객체 정보 ---");
+    console.log("File 객체:", file);
+    console.log("File 이름:", file.name);
+    console.log("File 크기 (bytes):", file.size);
+    console.log("File MIME 타입:", file.type);
+    console.log("-----------------------");
+    console.log("---url-------:", url);
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": file.type },
+      body: file
+    });
+    console.log(res);
+    if (!res.ok) {
+      throw new Error("S3 업로드 실패");
+    }
+
+    return { key, url };
+  }
 
   const handleRemoveImage = async () => {
     try {
@@ -173,7 +214,7 @@ const ProfileImageUpload = ({ currentImage, onImageChange }) => {
         showInitials={true}
         data-testid="profile-image-avatar"
       />
-      
+
       <HStack gap="$200" justifyContent="center">
         <Button
           type="button"

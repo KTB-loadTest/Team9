@@ -86,30 +86,70 @@ class FileService {
 
       const source = CancelToken.source();
       this.activeUploads.set(file.name, source);
+      /*
+            const uploadUrl = this.baseUrl ?
+              `${this.baseUrl}/api/files/upload` :
+              '/api/files/upload';
+      */
+      const key = `${crypto.randomUUID()}-${file.name}`;
+      const url = `https://s3.ap-northeast-2.amazonaws.com/goorm-ktb-009.goorm.team/uploads/${key}`;
 
-      const uploadUrl = this.baseUrl ?
-        `${this.baseUrl}/api/files/upload` :
-        '/api/files/upload';
-
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file
+      });
+      console.log(res);
+      if (!res.ok) {
+        throw new Error("S3 업로드 실패");
+      }
       // token과 sessionId는 axios 인터셉터에서 자동으로 추가되므로
       // 여기서는 명시적으로 전달하지 않아도 됩니다
-      const response = await axiosInstance.post(uploadUrl, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        },
-        cancelToken: source.token,
-        withCredentials: true,
-        onUploadProgress: (progressEvent) => {
-          if (onProgress) {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+      /*
+            const response = await fetch(
+              `http://localhost:5001/api/files/upload`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-auth-token": user?.token,
+                  "x-session-id": user?.sessionId,
+                },
+                body: JSON.stringify({
+                  key: key,
+                  url: url,
+                  originalname: file.name,
+                  mimetype: file.type,
+                  size: file.size,
+                }),
+              }
             );
-            onProgress(percentCompleted);
-          }
-        }
+            */
+      const response = await axiosInstance.post('/api/files/upload', {
+        key,
+        url,
+        originalname: file.name,
+        mimetype: file.type,
+        size: file.size,
       });
-
-      this.activeUploads.delete(file.name);
+      /*
+            const response = await axiosInstance.post(uploadUrl, formData, {
+              headers: {
+                'Content-Type': 'multipart/form-data'
+              },
+              cancelToken: source.token,
+              withCredentials: true,
+              onUploadProgress: (progressEvent) => {
+                if (onProgress) {
+                  const percentCompleted = Math.round(
+                    (progressEvent.loaded * 100) / progressEvent.total
+                  );
+                  onProgress(percentCompleted);
+                }
+              }
+            });
+      
+            this.activeUploads.delete(file.name);*/
 
       if (!response.data || !response.data.success) {
         return {
@@ -353,7 +393,8 @@ class FileService {
     if (error.code === 'ECONNABORTED') {
       return {
         success: false,
-        message: '파일 다운로드 시간이 초과되었습니다.'};
+        message: '파일 다운로드 시간이 초과되었습니다.'
+      };
     }
 
     if (axios.isAxiosError(error)) {
@@ -419,7 +460,7 @@ class FileService {
       this.activeUploads.delete(filename);
       canceledCount++;
     }
-    
+
     return {
       success: true,
       message: `${canceledCount}개의 업로드가 취소되었습니다.`,
