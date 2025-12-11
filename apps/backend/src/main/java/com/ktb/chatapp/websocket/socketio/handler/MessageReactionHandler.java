@@ -6,12 +6,16 @@ import com.corundumstudio.socketio.annotation.OnEvent;
 import com.ktb.chatapp.dto.MessageReactionRequest;
 import com.ktb.chatapp.dto.MessageReactionResponse;
 import com.ktb.chatapp.model.Message;
-import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
 
 import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
@@ -27,7 +31,7 @@ import static com.ktb.chatapp.websocket.socketio.SocketIOEvents.*;
 public class MessageReactionHandler {
     
     private final SocketIOServer socketIOServer;
-    private final MessageRepository messageRepository;
+    private final MongoTemplate mongoTemplate;
     
     @OnEvent(MESSAGE_REACTION)
     public void handleMessageReaction(SocketIOClient client, MessageReactionRequest data) {
@@ -38,29 +42,37 @@ public class MessageReactionHandler {
                 return;
             }
 
-            Message message = messageRepository.findById(data.getMessageId()).orElse(null);
+            if (data == null || data.getMessageId() == null || data.getReaction() == null) {
+                client.sendEvent(ERROR, Map.of("message", "지원하지 않는 리액션 타입입니다."));
+                return;
+            }
+
+            /*
+             * 기존 방식: 메시지 전체를 findById 후 add/remove 후 save
+             *  - 매 요청당 읽기 + 쓰기 전체 문서 전송
+             *  - 동시성 충돌 시 마지막 저장이 덮어쓰는 위험
+             *
+             * Message message = messageRepository.findById(data.getMessageId()).orElse(null);
+             * ... mutate in memory ...
+             * messageRepository.save(message);
+             *
+             * 개선: MongoDB findAndModify + $addToSet / $pull 로 원자적 업데이트
+             *  - 한 번의 네트워크 라운드트립
+             *  - 문서 일부 필드만 프로젝션 (room, reactions) 으로 전송량 감소
+             *  - 동시성 안전하게 리액션 추가/제거
+             */
+            Message message = updateReactionsAtomic(data.getMessageId(), data.getReaction(), data.getType(), userId);
             if (message == null) {
                 client.sendEvent(ERROR, Map.of("message", "메시지를 찾을 수 없습니다."));
                 return;
             }
 
-            switch (data.getType()) {
-                case "add" -> message.addReaction(data.getReaction(), userId);
-                case "remove" -> message.removeReaction(data.getReaction(), userId);
-                case null, default -> {
-                    client.sendEvent(ERROR, Map.of("message", "지원하지 않는 리액션 타입입니다."));
-                    return;
-                }
-            }
-
             log.debug("Message reaction processed - type: {}, reaction: {}, messageId: {}, userId: {}",
                 data.getType(), data.getReaction(), message.getId(), userId);
 
-            messageRepository.save(message);
-
             MessageReactionResponse response = new MessageReactionResponse(
                 message.getId(),
-                message.getReactions()
+                message.getReactions() != null ? message.getReactions() : Map.of()
             );
 
             socketIOServer.getRoomOperations(message.getRoomId())
@@ -77,5 +89,27 @@ public class MessageReactionHandler {
     private String getUserId(SocketIOClient client) {
         var user = (SocketUser) client.get("user");
         return user.id();
+    }
+
+    private Message updateReactionsAtomic(String messageId, String reaction, String type, String userId) {
+        Query query = Query.query(Criteria.where("_id").is(messageId));
+        // 필요한 필드만 반환하여 전송량 절약
+        query.fields().include("room").include("reactions");
+
+        Update update = new Update();
+        switch (type) {
+            case "add" -> update.addToSet("reactions." + reaction, userId);
+            case "remove" -> update.pull("reactions." + reaction, userId);
+            default -> {
+                return null;
+            }
+        }
+
+        return mongoTemplate.findAndModify(
+                query,
+                update,
+                FindAndModifyOptions.options().returnNew(true),
+                Message.class
+        );
     }
 }
