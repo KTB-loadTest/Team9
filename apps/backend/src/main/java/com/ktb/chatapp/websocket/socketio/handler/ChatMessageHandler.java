@@ -13,11 +13,11 @@ import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
 import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.RateLimiter;
 import com.ktb.chatapp.util.BannedWordChecker;
 import com.ktb.chatapp.websocket.socketio.ai.AiService;
 import com.ktb.chatapp.service.SessionService;
 import com.ktb.chatapp.service.SessionValidationResult;
-import com.ktb.chatapp.service.RateLimitService;
 import com.ktb.chatapp.service.RateLimitCheckResult;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import io.micrometer.core.instrument.Counter;
@@ -46,9 +46,9 @@ public class ChatMessageHandler {
     private final AiService aiService;
     private final SessionService sessionService;
     private final BannedWordChecker bannedWordChecker;
-    private final RateLimitService rateLimitService;
+    private final RateLimiter rateLimiter;
     private final MeterRegistry meterRegistry;
-    
+
     @OnEvent(CHAT_MESSAGE)
     public void handleChatMessage(SocketIOClient client, ChatMessageRequest data) {
         Timer.Sample timerSample = Timer.start(meterRegistry);
@@ -89,7 +89,7 @@ public class ChatMessageHandler {
 
         // Rate limit check
         RateLimitCheckResult rateLimitResult =
-                rateLimitService.checkRateLimit(socketUser.id(), 10000, Duration.ofMinutes(1));
+                rateLimiter.checkRateLimit(socketUser.id(), 10000, Duration.ofMinutes(1));
         if (!rateLimitResult.allowed()) {
             recordError("rate_limit_exceeded");
             Counter.builder("socketio.messages.rate_limit")
@@ -106,7 +106,7 @@ public class ChatMessageHandler {
             timerSample.stop(createTimer("error", "rate_limit"));
             return;
         }
-        
+
         try {
             User sender = userRepository.findById(socketUser.id()).orElse(null);
             if (sender == null) {
@@ -165,7 +165,7 @@ public class ChatMessageHandler {
                     .sendEvent(MESSAGE, createMessageResponse(savedMessage, sender));
 
             // AI 멘션 처리
-            aiService.handleAIMentions(roomId, socketUser.id(), messageContent);
+//            aiService.handleAIMentions(roomId, socketUser.id(), messageContent);
 
             sessionService.updateLastActivity(socketUser.id());
 
