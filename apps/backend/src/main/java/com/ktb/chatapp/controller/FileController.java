@@ -1,5 +1,6 @@
 package com.ktb.chatapp.controller;
 
+import com.ktb.chatapp.dto.RemoteFileRequest;
 import com.ktb.chatapp.dto.StandardResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.User;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +30,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "파일 (Files)", description = "파일 업로드 및 다운로드 API")
 @Slf4j
@@ -44,7 +45,7 @@ public class FileController {
     /**
      * 파일 업로드
      */
-    @Operation(summary = "파일 업로드", description = "파일을 업로드합니다. 최대 50MB까지 가능합니다.")
+    @Operation(summary = "파일 업로드", description = "스토리지(S3 등)에 업로드된 파일의 키/메타데이터를 전달해 저장합니다.")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "파일 업로드 성공"),
         @ApiResponse(responseCode = "400", description = "잘못된 파일",
@@ -58,13 +59,16 @@ public class FileController {
     })
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(
-            @Parameter(description = "업로드할 파일") @RequestParam("file") MultipartFile file,
+            @RequestBody(description = "스토리지에 업로드한 파일 메타데이터",
+                    required = true,
+                    content = @Content(schema = @Schema(implementation = RemoteFileRequest.class)))
+            @org.springframework.web.bind.annotation.RequestBody RemoteFileRequest fileRequest,
             Principal principal) {
         try {
             User user = userRepository.findByEmail(principal.getName())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found: " + principal.getName()));
 
-            FileUploadResult result = fileService.uploadFile(file, user.getId());
+            FileUploadResult result = fileService.uploadFile(fileRequest, user.getId());
 
             if (result.isSuccess()) {
                 Map<String, Object> response = new HashMap<>();
@@ -78,6 +82,9 @@ public class FileController {
                 fileData.put("mimetype", result.getFile().getMimetype());
                 fileData.put("size", result.getFile().getSize());
                 fileData.put("uploadDate", result.getFile().getUploadDate());
+                fileData.put("url", result.getFile().getPath() != null
+                        ? result.getFile().getPath()
+                        : result.getFile().getFilename());
                 
                 response.put("file", fileData);
 

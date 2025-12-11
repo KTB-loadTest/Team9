@@ -62,6 +62,7 @@ public class MessageResponseMapper {
                         .originalname(file.getOriginalname())
                         .mimetype(file.getMimetype())
                         .size(file.getSize())
+                        .url(file.getPath() != null ? file.getPath() : file.getFilename())
                         .build())
                 .ifPresent(builder::file);
 

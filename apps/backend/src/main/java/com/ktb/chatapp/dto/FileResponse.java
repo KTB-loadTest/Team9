@@ -20,6 +20,7 @@ public class FileResponse {
     private String originalname;
     private String mimetype;
     private long size;
+    private String url;
     private String user;
     private LocalDateTime uploadDate;
 
@@ -31,6 +32,7 @@ public class FileResponse {
                 .originalname(file.getOriginalname())
                 .mimetype(file.getMimetype())
                 .size(file.getSize())
+                .url(file.getPath() != null ? file.getPath() : file.getFilename())
                 .user(file.getUser())
                 .uploadDate(file.getUploadDate())
                 .build();
