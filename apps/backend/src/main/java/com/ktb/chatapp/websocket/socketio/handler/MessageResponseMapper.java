@@ -3,9 +3,9 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.ktb.chatapp.dto.FileResponse;
 import com.ktb.chatapp.dto.MessageResponse;
 import com.ktb.chatapp.dto.UserResponse;
+import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.User;
-import com.ktb.chatapp.repository.FileRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Optional;
@@ -22,8 +22,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MessageResponseMapper {
 
-    private final FileRepository fileRepository;
-
     /**
      * Message 엔티티를 MessageResponse DTO로 변환
      *
@@ -32,6 +30,20 @@ public class MessageResponseMapper {
      * @return MessageResponse DTO
      */
     public MessageResponse mapToMessageResponse(Message message, User sender) {
+        // 기존 N+1 방식(참고용): 메시지마다 파일을 개별 조회
+        // Optional.ofNullable(message.getFileId())
+        //         .flatMap(fileRepository::findById)
+        //         .map(FileResponse::from)
+        //         .ifPresent(builder::file);
+
+        // 개선: 파일은 호출부에서 미리 캐싱해 주입 (null이면 파일 없음)
+        return mapToMessageResponse(message, sender, null);
+    }
+
+    /**
+     * Message 엔티티를 MessageResponse DTO로 변환 (이미 로드된 파일을 주입)
+     */
+    public MessageResponse mapToMessageResponse(Message message, User sender, File file) {
         MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .id(message.getId())
                 .content(message.getContent())
@@ -53,17 +65,9 @@ public class MessageResponseMapper {
                     .build());
         }
 
-        // 파일 정보 설정
-        Optional.ofNullable(message.getFileId())
-                .flatMap(fileRepository::findById)
-                .map(file -> FileResponse.builder()
-                        .id(file.getId())
-                        .filename(file.getFilename())
-                        .originalname(file.getOriginalname())
-                        .mimetype(file.getMimetype())
-                        .size(file.getSize())
-                        .url(file.getPath() != null ? file.getPath() : file.getFilename())
-                        .build())
+        // 파일 정보 설정 (미리 로드된 파일만 사용)
+        Optional.ofNullable(file)
+                .map(FileResponse::from)
                 .ifPresent(builder::file);
 
         // 메타데이터 설정

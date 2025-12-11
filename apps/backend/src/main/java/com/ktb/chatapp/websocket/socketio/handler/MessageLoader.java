@@ -3,8 +3,10 @@ package com.ktb.chatapp.websocket.socketio.handler;
 import com.ktb.chatapp.dto.FetchMessagesRequest;
 import com.ktb.chatapp.dto.FetchMessagesResponse;
 import com.ktb.chatapp.dto.MessageResponse;
+import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
@@ -32,6 +34,7 @@ public class MessageLoader {
 
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final FileRepository fileRepository;
     private final MessageResponseMapper messageResponseMapper;
     private final MessageReadStatusService messageReadStatusService;
 
@@ -70,16 +73,19 @@ public class MessageLoader {
         var messageIds = sortedMessages.stream().map(Message::getId).toList();
         messageReadStatusService.updateReadStatus(messageIds, userId);
 
-        // 기존(N+1) 방식: 메시지마다 findById 호출 → 메시지 수만큼 DB round-trip.
-        // var user = findUserById(message.getSenderId());
-        // 개선: 한 번에 사용자 정보를 불러와 맵으로 캐싱해 재사용.
+        // 기존(N+1) 방식: 메시지마다 user/file을 단건 조회 → round-trip 증가
+        // 개선: 한 번에 사용자/파일 정보를 불러와 맵으로 캐싱해 재사용.
         Map<String, User> senderMap = preloadSenders(sortedMessages);
+        Map<String, File> fileMap = preloadFiles(sortedMessages);
         
         // 메시지 응답 생성
         List<MessageResponse> messageResponses = sortedMessages.stream()
                 .map(message -> {
                     User sender = senderMap.get(message.getSenderId());
-                    return messageResponseMapper.mapToMessageResponse(message, sender);
+                    return messageResponseMapper.mapToMessageResponse(
+                            message,
+                            sender,
+                            fileMap.get(message.getFileId()));
                 })
                 .collect(Collectors.toList());
 
@@ -120,5 +126,24 @@ public class MessageLoader {
          *             .orElse(null);
          * }
          */
+    }
+
+    /**
+     * 파일을 한 번에 로드해 Map으로 캐싱 (N+1 방지)
+     */
+    private Map<String, File> preloadFiles(List<Message> messages) {
+        Set<String> fileIds = messages.stream()
+                .map(Message::getFileId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (fileIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        // 기존: 메시지마다 fileRepository.findById → N+1
+        // 개선: findAllById로 일괄 조회 후 Map 활용
+        return fileRepository.findAllById(fileIds).stream()
+                .collect(Collectors.toMap(File::getId, f -> f));
     }
 }
