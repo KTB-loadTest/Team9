@@ -12,7 +12,7 @@ import com.ktb.chatapp.model.*;
 import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
-import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.service.RateLimiter;
 import com.ktb.chatapp.util.BannedWordChecker;
 import com.ktb.chatapp.websocket.socketio.ai.AiService;
@@ -41,7 +41,7 @@ public class ChatMessageHandler {
     private final SocketIOServer socketIOServer;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
-    private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     private final FileRepository fileRepository;
     private final AiService aiService;
     private final SessionService sessionService;
@@ -108,7 +108,7 @@ public class ChatMessageHandler {
         }
 
         try {
-            User sender = userRepository.findById(socketUser.id()).orElse(null);
+            User sender = userCacheService.get(socketUser.id());
             if (sender == null) {
                 recordError("user_not_found");
                 client.sendEvent(ERROR, Map.of(

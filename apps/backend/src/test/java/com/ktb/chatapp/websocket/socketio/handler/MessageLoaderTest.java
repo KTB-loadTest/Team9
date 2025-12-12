@@ -46,6 +46,9 @@ class MessageLoaderTest {
     
     @Mock
     private MessageReadStatusService messageReadStatusService;
+
+    @Mock
+    private com.ktb.chatapp.service.UserCacheService userCacheService;
     
     @InjectMocks
     private MessageLoader messageLoader;
@@ -65,7 +68,7 @@ class MessageLoaderTest {
                 messageRepository,
                 userRepository,
                 fileRepository,
-                new MessageResponseMapper(),
+                new MessageResponseMapper(userCacheService),
                 messageReadStatusService
         );
         

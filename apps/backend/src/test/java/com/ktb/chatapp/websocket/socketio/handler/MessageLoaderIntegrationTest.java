@@ -46,6 +46,9 @@ class MessageLoaderIntegrationTest {
     @Autowired
     private FileRepository fileRepository;
 
+    @Autowired
+    private com.ktb.chatapp.service.UserCacheService userCacheService;
+
     @MockitoSpyBean
     private MessageReadStatusService messageReadStatusService;
 
@@ -66,7 +69,7 @@ class MessageLoaderIntegrationTest {
                 messageRepository,
                 userRepository,
                 fileRepository,
-                new MessageResponseMapper(),
+                new MessageResponseMapper(userCacheService),
                 messageReadStatusService
         );
 

@@ -6,6 +6,7 @@ import com.ktb.chatapp.dto.UserResponse;
 import com.ktb.chatapp.model.File;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.User;
+import com.ktb.chatapp.service.UserCacheService;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Optional;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class MessageResponseMapper {
+
+    private final UserCacheService userCacheService;
 
     /**
      * Message 엔티티를 MessageResponse DTO로 변환
@@ -56,6 +59,10 @@ public class MessageResponseMapper {
                         message.getReaders() : new ArrayList<>());
 
         // 발신자 정보 설정
+        if (sender == null && message.getSenderId() != null) {
+            sender = userCacheService.get(message.getSenderId());
+        }
+
         if (sender != null) {
             builder.sender(UserResponse.builder()
                     .id(sender.getId())

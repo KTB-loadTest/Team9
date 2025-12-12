@@ -8,7 +8,7 @@ import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.repository.FileRepository;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
-import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.service.RateLimitCheckResult;
 import com.ktb.chatapp.service.RateLimitService;
 import com.ktb.chatapp.service.SessionService;
@@ -39,7 +39,7 @@ class ChatMessageHandlerTest {
     @Mock private SocketIOServer socketIOServer;
     @Mock private MessageRepository messageRepository;
     @Mock private RoomRepository roomRepository;
-    @Mock private UserRepository userRepository;
+    @Mock private UserCacheService userCacheService;
     @Mock private FileRepository fileRepository;
     @Mock private AiService aiService;
     @Mock private SessionService sessionService;
@@ -56,7 +56,7 @@ class ChatMessageHandlerTest {
                         socketIOServer,
                         messageRepository,
                         roomRepository,
-                        userRepository,
+                        userCacheService,
                         fileRepository,
                         aiService,
                         sessionService,
@@ -81,7 +81,7 @@ class ChatMessageHandlerTest {
 
         User user = new User();
         user.setId("user-1");
-        when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
+        when(userCacheService.get("user-1")).thenReturn(user);
 
         Room room = new Room();
         room.setId("room-1");

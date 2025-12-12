@@ -9,10 +9,11 @@ import com.ktb.chatapp.dto.JoinRoomSuccessResponse;
 import com.ktb.chatapp.dto.UserResponse;
 import com.ktb.chatapp.model.Message;
 import com.ktb.chatapp.model.MessageType;
+import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
-import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import com.ktb.chatapp.websocket.socketio.UserRooms;
 import java.time.LocalDateTime;
@@ -37,7 +38,7 @@ public class RoomJoinHandler {
     private final SocketIOServer socketIOServer;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
-    private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     private final UserRooms userRooms;
     private final MessageLoader messageLoader;
     private final MessageResponseMapper messageResponseMapper;
@@ -54,7 +55,7 @@ public class RoomJoinHandler {
                 return;
             }
             
-            if (userRepository.findById(userId).isEmpty()) {
+            if (userCacheService.get(userId) == null) {
                 client.sendEvent(JOIN_ROOM_ERROR, Map.of("message", "User not found"));
                 return;
             }
@@ -105,11 +106,11 @@ public class RoomJoinHandler {
             }
 
             // 참가자 정보 조회
-            List<UserResponse> participants = roomOpt.get().getParticipantIds()
-                    .stream()
-                    .map(userRepository::findById)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
+            var participantIds = roomOpt.get().getParticipantIds();
+            Map<String, User> participantMap = userCacheService.getAll(participantIds);
+            List<UserResponse> participants = participantIds.stream()
+                    .map(participantMap::get)
+                    .filter(Objects::nonNull)
                     .map(UserResponse::from)
                     .toList();
             

@@ -10,8 +10,8 @@ import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
-import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.MessageReadStatusService;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class MessageReadHandler {
     private final MessageReadStatusService messageReadStatusService;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
-    private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     
     @OnEvent(MARK_MESSAGES_AS_READ)
     public void handleMarkAsRead(SocketIOClient client, MarkAsReadRequest data) {
@@ -58,7 +58,7 @@ public class MessageReadHandler {
                 return;
             }
 
-            User user = userRepository.findById(userId).orElse(null);
+            User user = userCacheService.get(userId);
             if (user == null) {
                 client.sendEvent(ERROR, Map.of("message", "User not found"));
                 return;

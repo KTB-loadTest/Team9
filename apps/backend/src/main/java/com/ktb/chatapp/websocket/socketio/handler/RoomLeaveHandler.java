@@ -11,13 +11,14 @@ import com.ktb.chatapp.model.Room;
 import com.ktb.chatapp.model.User;
 import com.ktb.chatapp.repository.MessageRepository;
 import com.ktb.chatapp.repository.RoomRepository;
-import com.ktb.chatapp.repository.UserRepository;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.websocket.socketio.SocketUser;
 import com.ktb.chatapp.websocket.socketio.UserRooms;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +40,7 @@ public class RoomLeaveHandler {
     private final SocketIOServer socketIOServer;
     private final MessageRepository messageRepository;
     private final RoomRepository roomRepository;
-    private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     private final UserRooms userRooms;
     private final MessageResponseMapper messageResponseMapper;
     
@@ -59,7 +60,7 @@ public class RoomLeaveHandler {
                 return;
             }
 
-            User user = userRepository.findById(userId).orElse(null);
+            User user = userCacheService.get(userId);
             Room room = roomRepository.findById(roomId).orElse(null);
             
             if (user == null || room == null) {
@@ -120,12 +121,11 @@ public class RoomLeaveHandler {
             return;
         }
         
-        var participantList = roomOpt.get()
-                .getParticipantIds()
-                .stream()
-                .map(userRepository::findById)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
+        var participantIds = roomOpt.get().getParticipantIds();
+        var participantMap = userCacheService.getAll(participantIds);
+        var participantList = participantIds.stream()
+                .map(participantMap::get)
+                .filter(Objects::nonNull)
                 .map(UserResponse::from)
                 .toList();
         

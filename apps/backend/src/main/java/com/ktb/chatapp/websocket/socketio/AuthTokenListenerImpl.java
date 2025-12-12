@@ -4,10 +4,10 @@ import com.corundumstudio.socketio.AuthTokenListener;
 import com.corundumstudio.socketio.AuthTokenResult;
 import com.corundumstudio.socketio.SocketIOClient;
 import com.ktb.chatapp.model.User;
-import com.ktb.chatapp.repository.UserRepository;
 import com.ktb.chatapp.service.JwtService;
 import com.ktb.chatapp.service.SessionService;
 import com.ktb.chatapp.service.SessionValidationResult;
+import com.ktb.chatapp.service.UserCacheService;
 import com.ktb.chatapp.websocket.socketio.handler.ConnectionLoginHandler;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +29,7 @@ public class AuthTokenListenerImpl implements AuthTokenListener {
 
     private final JwtService jwtService;
     private final SessionService sessionService;
-    private final UserRepository userRepository;
+    private final UserCacheService userCacheService;
     private final ObjectProvider<ConnectionLoginHandler> socketIOChatHandlerProvider;
 
     @Override
@@ -61,8 +61,8 @@ public class AuthTokenListenerImpl implements AuthTokenListener {
                 return new AuthTokenResult(false, Map.of("message", "Invalid session"));
             }
 
-            // Load user from database
-            User user = userRepository.findById(userId).orElse(null);
+            // Load user (캐시 우선)
+            User user = userCacheService.get(userId);
             if (user == null) {
                 log.error("User not found: {}", userId);
                 return new AuthTokenResult(false, Map.of("message", "User not found"));
